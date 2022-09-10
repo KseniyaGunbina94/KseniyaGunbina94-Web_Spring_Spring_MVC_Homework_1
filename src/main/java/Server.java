@@ -1,11 +1,13 @@
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class Server {
     public static final String GET = "GET";
@@ -31,6 +33,7 @@ public class Server {
         try (final var serverSocket = new ServerSocket(port)) {
             while (true) {
                 final var socket = serverSocket.accept();
+                System.out.println(LocalDateTime.now() + ":  New accept, port " + socket.getLocalPort());
                 threadPool.submit(() -> handlerConnection(socket));
             }
 
@@ -57,6 +60,7 @@ public class Server {
                 badRequest(out);
                 return;
             }
+            System.out.println(LocalDateTime.now() + ":  Request line: V");
 
             // читаем request line
             final var requestLine = new String(Arrays.copyOf(buffer, requestLineEnd)).split(" ");
@@ -64,8 +68,8 @@ public class Server {
                 badRequest(out);
                 return;
             }
-            Arrays.stream(requestLine).forEach(System.out::println);
 
+            // method и path
             final var method = requestLine[0];
             if (!allowedMethods.contains(method)) {
                 badRequest(out);
@@ -77,6 +81,7 @@ public class Server {
                 badRequest(out);
                 return;
             }
+            System.out.println(LocalDateTime.now() + ":  Method, path: V");
 
             // ищем заголовки
             final var headersDelimiter = new byte[]{'\r', '\n', '\r', '\n'};
@@ -94,6 +99,7 @@ public class Server {
 
             final var headersBytes = in.readNBytes(headersEnd - headersStart);
             final var headers = Arrays.asList(new String(headersBytes).split("\r\n"));
+            System.out.println(LocalDateTime.now() + ":  Headers: V");
 
             final var request = new Request(method, path, headers);
             System.out.println(request.toString());
@@ -111,6 +117,7 @@ public class Server {
                     System.out.println(body);
                 }
             }
+            request.toString();
 
             var methodMap = allHandlers.get(request.getMethod());
 
@@ -119,7 +126,7 @@ public class Server {
                 return;
             }
 
-            var handler = methodMap.get(request.getPath());
+            var handler = methodMap.get(request.getQueryParams());
 
             if (handler == null) {
                 notFound(out);
@@ -127,9 +134,8 @@ public class Server {
             }
 
             handler.handle(request, out);
-            //out.flush();
 
-        } catch (IOException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
