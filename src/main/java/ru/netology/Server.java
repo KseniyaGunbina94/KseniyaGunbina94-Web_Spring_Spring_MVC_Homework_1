@@ -6,6 +6,7 @@ import java.net.Socket;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -34,6 +35,7 @@ public class Server {
             final var threadPool = Executors.newFixedThreadPool(64);
             while (true) {
                 final var socket = serverSocket.accept();
+                System.out.println(LocalDateTime.now() + ":  New accept, port " + socket.getLocalPort());
                 threadPool.submit(() -> acceptConnection(socket));
             }
         } catch (IOException e) {
@@ -58,6 +60,7 @@ public class Server {
                 badRequest(out);
                 return;
             }
+            System.out.println(LocalDateTime.now() + ":  Request line: V");
 
             // читаем request line
             final var requestLine = new String(Arrays.copyOf(buffer, requestLineEnd)).split(" ");
@@ -66,12 +69,14 @@ public class Server {
                 return;
             }
 
+
             // method и path
             final var method = requestLine[0];
             if (!allowedMethods.contains(method)) {
                 badRequest(out);
                 return;
             }
+            System.out.println(LocalDateTime.now() + ":  Method, path: V");
 
             final var path = requestLine[1];
             if (!path.startsWith("/")) {
@@ -87,6 +92,7 @@ public class Server {
                 badRequest(out);
                 return;
             }
+            System.out.println(LocalDateTime.now() + ":  Headers: V");
 
             // отматываем на начало буфера
             in.reset();
@@ -127,10 +133,7 @@ public class Server {
                 notFound(out);
                 return;
             }
-
             handler.handle(request, out);
-            Files.copy(Path.of(".", "/public",path), out);
-            out.flush();
         } catch (IOException | URISyntaxException e) {
             e.printStackTrace();
         }
