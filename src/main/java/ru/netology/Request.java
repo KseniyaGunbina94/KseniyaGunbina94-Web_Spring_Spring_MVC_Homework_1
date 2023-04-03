@@ -1,3 +1,5 @@
+package ru.netology;
+
 import org.apache.http.NameValuePair;
 import org.apache.http.client.utils.URLEncodedUtils;
 
