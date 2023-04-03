@@ -6,11 +6,9 @@ import org.apache.http.client.utils.URLEncodedUtils;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.List;
 
 public class Request {
-
     private String method;
     private String path;
     private List<String> headers;

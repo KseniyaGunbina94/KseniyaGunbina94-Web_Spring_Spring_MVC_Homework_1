@@ -3,13 +3,13 @@ package ru.netology;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.URISyntaxException;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 public class Server {
     public static final String GET = "GET";
@@ -26,32 +26,28 @@ public class Server {
         methodMap.put(path, handler);
         allHandlers.put(method, methodMap);
     }
-
-    public void listen(int port) {
+    public void listen(int port) throws IOException {
         if (port <= 0)
             throw  new IllegalArgumentException("Server port must be greater than 0");
-
-        final var threadPool = Executors.newFixedThreadPool(64);
         try (final var serverSocket = new ServerSocket(port)) {
+            final var threadPool = Executors.newFixedThreadPool(64);
             while (true) {
                 final var socket = serverSocket.accept();
                 System.out.println(LocalDateTime.now() + ":  New accept, port " + socket.getLocalPort());
-                threadPool.submit(() -> handlerConnection(socket));
+                threadPool.submit(() -> acceptConnection(socket));
             }
-
-        } catch(IOException e){
+        } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    private void handlerConnection(Socket socket) {
+    public void acceptConnection(Socket socket) {
         try (final var in = new BufferedInputStream(socket.getInputStream());
              final var out = new BufferedOutputStream(socket.getOutputStream())) {
-            //  лимит на request line + заголовки
+
             final var limit = 4096;
 
             in.mark(limit);
-            System.out.println(Thread.currentThread().getName());
             final var buffer = new byte[limit];
             final var read = in.read(buffer);
 
@@ -71,19 +67,20 @@ public class Server {
                 return;
             }
 
+
             // method и path
             final var method = requestLine[0];
             if (!allowedMethods.contains(method)) {
                 badRequest(out);
                 return;
             }
+            System.out.println(LocalDateTime.now() + ":  Method, path: V");
 
             final var path = requestLine[1];
             if (!path.startsWith("/")) {
                 badRequest(out);
                 return;
             }
-            System.out.println(LocalDateTime.now() + ":  Method, path: V");
 
             // ищем заголовки
             final var headersDelimiter = new byte[]{'\r', '\n', '\r', '\n'};
@@ -93,6 +90,7 @@ public class Server {
                 badRequest(out);
                 return;
             }
+            System.out.println(LocalDateTime.now() + ":  Headers: V");
 
             // отматываем на начало буфера
             in.reset();
@@ -101,10 +99,9 @@ public class Server {
 
             final var headersBytes = in.readNBytes(headersEnd - headersStart);
             final var headers = Arrays.asList(new String(headersBytes).split("\r\n"));
-            System.out.println(LocalDateTime.now() + ":  Headers: V");
 
             final var request = new Request(method, path, headers);
-            System.out.println(request.toString());
+            System.out.println(request);
 
             // для GET тела нет
             if (!method.equals(GET)) {
@@ -134,32 +131,10 @@ public class Server {
                 notFound(out);
                 return;
             }
-
             handler.handle(request, out);
-
-        } catch (Exception e) {
+        } catch (IOException | URISyntaxException e) {
             e.printStackTrace();
         }
-    }
-
-    private void badRequest(BufferedOutputStream out) throws IOException {
-        out.write((
-                "HTTP/1.1 400 Bad Request\r\n" +
-                        "Content-Length: 0\r\n" +
-                        "Connection: close\r\n" +
-                        "\r\n"
-        ).getBytes());
-        out.flush();
-    }
-
-    private void notFound(BufferedOutputStream out) throws IOException {
-        out.write((
-                "HTTP/1.1 404 Not Found\r\n" +
-                        "Content-Length: 0\r\n" +
-                        "Connection: close\r\n" +
-                        "\r\n"
-        ).getBytes());
-        out.flush();
     }
 
     private static int indexOf(byte[] array, byte[] target, int start, int max) {
@@ -182,4 +157,25 @@ public class Server {
                 .map(String::trim)
                 .findFirst();
     }
+    private void badRequest(BufferedOutputStream out) throws IOException {
+        out.write((
+                "HTTP/1.1 400 Bad Request\r\n" +
+                        "Content-Length: 0\r\n" +
+                        "Connection: close\r\n" +
+                        "\r\n"
+        ).getBytes());
+        out.flush();
+    }
+
+    private void notFound(BufferedOutputStream out) throws IOException {
+        out.write((
+                "HTTP/1.1 404 Not Found\r\n" +
+                        "Content-Length: 0\r\n" +
+                        "Connection: close\r\n" +
+                        "\r\n"
+        ).getBytes());
+        out.flush();
+    }
 }
+
+
